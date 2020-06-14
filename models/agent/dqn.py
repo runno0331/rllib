@@ -7,7 +7,7 @@ import numpy as np
 from models.buffer.buffer import Transition, ReplayBuffer
 
 class DQN:
-    def __init__(self, qnet, policy, optimizer, replay_buffer, device, gamma=0.99, batch_size=32, update_target_interval=5):
+    def __init__(self, qnet, policy, optimizer, replay_buffer, device, gamma=0.99, batch_size=32, update_target_interval=1):
         self.qnet = qnet
         self.target_qnet = copy.deepcopy(self.qnet)
         self.policy = policy
@@ -43,6 +43,9 @@ class DQN:
 
         return action.item()
 
+    def calculate_next_state_values(self, next_state):
+        return self.target_qnet(next_state).max(1)[0].detach()
+
     def train(self):
         if len(self.replay_buffer) < self.batch_size:
             return None
@@ -58,7 +61,7 @@ class DQN:
 
         state_action_values = self.qnet(state_batch).gather(1, action_batch)
 
-        next_state_values = self.target_qnet(next_state_batch).max(1)[0].detach()
+        next_state_values = self.calculate_next_state_values(next_state_batch)
 
         expected_state_action_values = reward_batch + (self.gamma * next_state_values * not_done_batch) 
 

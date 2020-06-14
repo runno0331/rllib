@@ -3,6 +3,7 @@ import torch.optim as optim
 from models.buffer.buffer import ReplayBuffer
 from models.network.qnet import QNet
 from models.agent.dqn import DQN
+from models.agent.ddqn import DDQN
 from models.policy.epsilon_greedy import EpsilonGreedy, EpsilonGreedyExpDecay
 from models.logger.logger import Logger
 import numpy as np
@@ -17,6 +18,7 @@ learning_rate = 5e-4
 start_eps = 0.9
 end_eps = 0.1
 decay_step = 5000
+ddqn_flag = True
 
 env = gym.make('CartPole-v0')
 input_size = env.observation_space.shape[0]
@@ -29,7 +31,10 @@ mainQNet = QNet(input_size, output_size, hidden_size).to(device)
 optimizer = optim.Adam(mainQNet.parameters(), lr=learning_rate)
 replay_buffer = ReplayBuffer(capacity=capacity)
 policy = EpsilonGreedyExpDecay(start_eps, end_eps, decay_step)
-network = DQN(qnet=mainQNet, policy=policy, optimizer=optimizer, replay_buffer=replay_buffer, device=device, gamma=gamma, batch_size=batch_size)
+if ddqn_flag:
+    network = DDQN(qnet=mainQNet, policy=policy, optimizer=optimizer, replay_buffer=replay_buffer, device=device, gamma=gamma, batch_size=batch_size, update_target_interval=10)
+else:
+    network = DQN(qnet=mainQNet, policy=policy, optimizer=optimizer, replay_buffer=replay_buffer, device=device, gamma=gamma, batch_size=batch_size)
 logger = Logger()
 
 for episode in range(max_episodes):
@@ -42,7 +47,7 @@ for episode in range(max_episodes):
         next_observation, reward, done, _ = env.step(action)
         total_reward += reward
 
-        if done and step < 190:
+        if done and step < 200:
             reward = -1.0
         elif not done:
             reward = 0.0
