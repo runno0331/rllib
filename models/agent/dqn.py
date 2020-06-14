@@ -1,10 +1,9 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import copy
 import numpy as np
+from models.buffer.buffer import Transition
 
-from models.buffer.buffer import Transition, ReplayBuffer
 
 class DQN:
     def __init__(self, qnet, policy, optimizer, replay_buffer, device, gamma=0.99, batch_size=32, update_target_interval=1):
@@ -23,11 +22,13 @@ class DQN:
 
         self.total_steps = 0
 
+    # save model to save_dir
     def save(self, save_dir):
         if save_dir is not None:
             torch.save(self.qnet.state_dict(), save_dir)
             print("Saved model!")
 
+    # load model from load_dir
     def load(self, load_dir):
         if load_dir is not None:
             state_dict = torch.load(load_dir)
@@ -37,15 +38,18 @@ class DQN:
         else:
             raise ValueError("Load Directory")
 
+    # select action according to the policy
     def take_action(self, state, greedy=False):
         state_tensor = torch.tensor(state, device=self.device, dtype=torch.float).view(-1, self.num_state)
         action = self.policy.get_action(state_tensor, self.qnet, self.device, greedy)
 
         return action.item()
 
+    # calculate max_a Q(s_t+1)
     def calculate_next_state_values(self, next_state):
         return self.target_qnet(next_state).max(1)[0].detach()
 
+    # train Q network
     def train(self):
         if len(self.replay_buffer) < self.batch_size:
             return None
