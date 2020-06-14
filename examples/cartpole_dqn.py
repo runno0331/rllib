@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+
 import torch
 import torch.optim as optim
 from models.buffer.buffer import ReplayBuffer
@@ -21,7 +24,7 @@ decay_step = 5000
 ddqn_flag = True
 
 env = gym.make('CartPole-v0')
-input_size = env.observation_space.shape[0]
+input_size = env.observation_space.shape
 output_size = env.action_space.n
 hidden_size = 8
 

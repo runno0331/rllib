@@ -40,7 +40,7 @@ class DQN:
 
     # select action according to the policy
     def take_action(self, state, greedy=False):
-        state_tensor = torch.tensor(state, device=self.device, dtype=torch.float).view(-1, self.num_state)
+        state_tensor = torch.tensor(state, device=self.device, dtype=torch.float).view(-1, *self.num_state)
         action = self.policy.get_action(state_tensor, self.qnet, self.device, greedy)
 
         return action.item()
