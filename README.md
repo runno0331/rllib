@@ -3,4 +3,5 @@ Library for reinforcement learning
 
 ## implemented algorythm
 - DQN, DQN
-- Policy Gradient
+- "Vanilla" Policy Gradient
+- Actor Critic
