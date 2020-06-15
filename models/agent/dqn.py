@@ -37,9 +37,15 @@ class DQN:
             print("Loaded model!")
         else:
             raise ValueError("Load Directory")
+    
+    def add_memory(self, *args):
+        self.replay_buffer.append(*args)
+
+    def reset_memory(self):
+        self.replay_buffer.reset()
 
     # select action according to the policy
-    def take_action(self, state, greedy=False):
+    def get_action(self, state, greedy=False):
         state_tensor = torch.tensor(state, device=self.device, dtype=torch.float).view(-1, *self.num_state)
         action = self.policy.get_action(state_tensor, self.qnet, self.device, greedy)
 

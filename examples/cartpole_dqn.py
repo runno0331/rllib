@@ -1,6 +1,5 @@
 import sys
 sys.path.append('../')
-
 import torch
 import torch.optim as optim
 from models.buffer.buffer import ReplayBuffer
@@ -21,7 +20,7 @@ learning_rate = 5e-4
 start_eps = 0.9
 end_eps = 0.1
 decay_step = 5000
-ddqn_flag = True
+ddqn_flag = False
 
 env = gym.make('CartPole-v0')
 input_size = env.observation_space.shape
@@ -46,7 +45,7 @@ for episode in range(max_episodes):
     total_loss = []
 
     for step in range(max_steps):
-        action = network.take_action(observation)
+        action = network.get_action(observation)
         next_observation, reward, done, _ = env.step(action)
         total_reward += reward
 
@@ -55,7 +54,7 @@ for episode in range(max_episodes):
         elif not done:
             reward = 0.0
 
-        replay_buffer.append(observation, action, next_observation, reward, done)
+        network.add_memory(observation, action, next_observation, reward, done)
 
         loss = network.train()
         if loss is not None:
