@@ -3,6 +3,7 @@ import random
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward', 'done'))
 
+
 class ReplayBuffer(object):
     def __init__(self, capacity=1e6):
         self.capacity = capacity
@@ -14,6 +15,9 @@ class ReplayBuffer(object):
 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
+
+    def reset(self):
+        self.memory.clear()
 
     def length(self):
         return len(self.memory)
