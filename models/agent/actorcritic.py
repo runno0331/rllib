@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from models.agent.policygrad import PolicyGrad
 
+
 class ActorCritic(PolicyGrad):
     def add_memory(self, reward, prob, state_value):
         self.memory.append((reward, prob, state_value))

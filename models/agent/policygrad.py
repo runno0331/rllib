@@ -16,15 +16,14 @@ class PolicyGrad:
     # save model to save_dir
     def save(self, save_dir):
         if save_dir is not None:
-            torch.save(self.qnet.state_dict(), save_dir)
+            torch.save(self.pinet.state_dict(), save_dir)
             print("Saved model!")
 
     # load model from load_dir
     def load(self, load_dir):
         if load_dir is not None:
             state_dict = torch.load(load_dir)
-            self.qnet.load_state_dict(state_dict)
-            self.target_qnet.load_state_dict(load_dir)
+            self.pinet.load_state_dict(state_dict)
             print("Loaded model!")
         else:
             raise ValueError("Load Directory")
