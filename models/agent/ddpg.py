@@ -6,7 +6,7 @@ from models.buffer.buffer import Transition
 
 
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, theta=0.15, mu=0.0, sigma=0.3, dt=1e-2, x0=None, size=1, sigma_min=None, n_steps_annealing=1000):
+    def __init__(self, theta=0.15, mu=0.0, sigma=0.2, dt=1e-2, x0=None, size=1, sigma_min=None, n_steps_annealing=1000):
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
@@ -36,9 +36,31 @@ class OrnsteinUhlenbeckProcess:
         self.num_steps += 1
         return x
 
+    def reset(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
+
+
+class AdaptiveParamNoise:
+    def __init__(self, init_std=0.1, desired_std=0.1, alpha=1.01):
+        self.init_std = init_std
+        self.desired_std = desired_std
+        self.alpha = alpha
+
+        self.current_std = init_std
+
+    def adapt(self, distance):
+        if distance > self.desired_std:
+            # print('down')
+            self.current_std /= self.alpha
+        else:
+            self.current_std *= self.alpha
+
+    def get_std(self):
+        return self.current_std
+
 
 class DDPG:
-    def __init__(self, actor, critic, optimizer_actor, optimizer_critic, replay_buffer, device, gamma=0.99, tau=1e-3, epsilon=1.0, batch_size=64):
+    def __init__(self, actor, critic, optimizer_actor, optimizer_critic, replay_buffer, device, param_noise=False, gamma=0.99, tau=1e-3, epsilon=1.0, batch_size=64):
         self.actor = actor
         self.critic = critic
         self.actor_target = copy.deepcopy(self.actor)
@@ -51,7 +73,14 @@ class DDPG:
         self.tau = tau
         self.epsilon = epsilon
         self.batch_size = batch_size
-        self.random_process = OrnsteinUhlenbeckProcess(size=actor.num_action[0])
+
+        self.actor_perturb = copy.deepcopy(self.actor)
+        self.actor_noise = None
+        self.random_process = None
+        if param_noise:
+            self.actor_noise = AdaptiveParamNoise()
+        else:
+            self.random_process = OrnsteinUhlenbeckProcess(size=actor.num_action[0])
 
         self.num_state = actor.num_state
         self.num_action = actor.num_action
@@ -62,11 +91,34 @@ class DDPG:
     def reset_memory(self):
         self.replay_buffer.reset()
 
+    def update_perturbed_actor(self):
+        if len(self.replay_buffer) > self.batch_size:
+            transitions = self.replay_buffer.sample(self.batch_size)
+            batch = Transition(*zip(*transitions))
+            state_batch = torch.tensor(batch.state, device=self.device, dtype=torch.float)
+            actions = self.actor(state_batch)
+            actions_perturb = self.actor_perturb(state_batch)
+            distance = torch.sqrt(torch.mean(torch.pow(actions - actions_perturb, exponent=2.0))).item()
+            self.actor_noise.adapt(distance)
+
+        std = self.actor_noise.get_std()
+        for perturb_param, param in zip(self.actor_perturb.parameters(), self.actor.parameters()):
+            perturb_param.data.copy_(param.data + std*torch.randn_like(param.data))
+
     def get_action(self, state, greedy=False):
         state_tensor = torch.tensor(state, dtype=torch.float, device=self.device).view(-1, *self.num_state)
-        action = self.actor(state_tensor)
-        if not greedy:
+
+        if not greedy and self.actor_noise is not None:
+            self.actor_perturb.eval()
+            action = self.actor_perturb(state_tensor)
+        else:
+            self.actor.eval()
+            action = self.actor(state_tensor)
+            self.actor.train()
+
+        if not greedy and self.random_process is not None:
             action += self.epsilon*torch.tensor(self.random_process.sample(), dtype=torch.float, device=self.device)
+            action = action.clamp(min=-1.0, max=1.0)
 
         return action.squeeze(0).detach().cpu().numpy()
 
@@ -86,7 +138,7 @@ class DDPG:
         # need to change
         qvalue = self.critic(state_batch, action_batch)
         next_qvalue = self.critic_target(next_state_batch, self.actor_target(next_state_batch))
-        target_qvalue = reward_batch + (self.gamma * next_qvalue) 
+        target_qvalue = reward_batch + (self.gamma * next_qvalue * not_done_batch) 
 
         critic_loss = F.mse_loss(qvalue, target_qvalue)
         self.optimizer_critic.zero_grad()
