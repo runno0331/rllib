@@ -3,6 +3,8 @@ sys.path.append('../')
 import torch
 import torch.optim as optim
 import gym
+import numpy as np
+from collections import deque
 from models.agent.ddpg import DDPG
 from models.network.actorCriticNet import ActorNetwork, CriticNetwork
 from models.buffer.buffer import ReplayBuffer
@@ -10,7 +12,7 @@ from models.logger.logger import Logger
 
 
 max_episodes = 10000
-memory_capacity = 1e6
+memory_capacity = 1e5
 gamma = 0.99
 tau = 1e-3  # soft target update parameter
 epsilon = 1.0
@@ -24,8 +26,10 @@ warmup_steps = 1000
 param_noise = False
 num_train = 50
 sample_step = 100
+running_mean = 10
 
-env = gym.make('HalfCheetah-v2')
+# env = gym.make('HalfCheetah-v2')
+env = gym.make('Ant-v2')
 # env = gym.make('Hopper-v2')
 # env = gym.make('Pendulum-v0')
 # env = gym.make('Humanoid-v2')
@@ -46,6 +50,7 @@ optimizer_critic = optim.Adam(criticNet.parameters(), lr=lr_critic, weight_decay
 replay_buffer = ReplayBuffer(capacity=memory_capacity)
 agent = DDPG(actorNet, criticNet, optimizer_actor, optimizer_critic, replay_buffer, device, param_noise, gamma, tau, epsilon, batch_size)
 logger = Logger()
+reward_record = deque(maxlen=running_mean)
 
 print('Warming up')
 step_count = 0
@@ -79,7 +84,7 @@ for episode in range(max_episodes):
 
         if done:
             break
-    
+    reward_record.append(total_reward)
     for _ in range(num_train):
         agent.train()
     if param_noise:
@@ -92,6 +97,7 @@ for episode in range(max_episodes):
         for step in range(max_steps):
             action = agent.get_action(observation, greedy=True)
             next_observation, reward, done, _ = env.step(action)
+            agent.add_memory(observation, action, next_observation, reward, done)
             temp += reward
             observation = next_observation
             env.render()
@@ -101,8 +107,8 @@ for episode in range(max_episodes):
         print("test reward:{}".format(temp))
 
     if episode % logger_interval == 0:
-        print("episode:{} total reward:{}".format(episode, total_reward))
-    logger.update(total_reward=total_reward)
+        print("episode:{} total reward:{}".format(episode, np.mean(reward_record)))
+    logger.update(total_reward=np.mean(reward_record))
 
 logger.show_total_reward_record()
 

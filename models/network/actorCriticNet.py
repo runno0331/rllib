@@ -34,9 +34,8 @@ class ActorNetwork(nn.Module):
         self.fc3 = nn.Linear(hidden2_size, num_action[0])
 
         if perturb:
-            self.bn0 = nn.LayerNorm(num_state[0])
-            self.bn1 = nn.LayerNorm(hidden1_size)
-            self.bn2 = nn.LayerNorm(hidden2_size)
+            self.ln0 = nn.LayerNorm(hidden1_size)
+            self.ln1 = nn.LayerNorm(hidden2_size)
         else:
             self.bn0 = nn.BatchNorm1d(num_state[0])
             self.bn1 = nn.BatchNorm1d(hidden1_size)
@@ -44,33 +43,42 @@ class ActorNetwork(nn.Module):
 
         self.num_state = num_state
         self.num_action = num_action
+        self.perturb = perturb
 
         self.fc1.weight.data = init_weight(self.fc1.weight.data.size())
         self.fc2.weight.data = init_weight(self.fc2.weight.data.size())
         self.fc3.weight.data.uniform_(-init_w, init_w)
 
     def forward(self, x):
-        h = self.bn0(x)
-        h = F.relu(self.fc1(h))
-        h = self.bn1(h)
-        h = F.relu(self.fc2(h))
-        h = self.bn2(h)
-        y = torch.tanh(self.fc3(h))
+        if self.perturb:
+            h = self.fc1(x)
+            h = F.relu(self.ln0(h))
+            h = self.fc2(h)
+            h = F.relu(self.ln1(h))
+            y = torch.tanh(self.fc3(h))
+        else:
+            h = self.bn0(x)
+            h = F.relu(self.fc1(h))
+            h = self.bn1(h)
+            h = F.relu(self.fc2(h))
+            h = self.bn2(h)
+            y = torch.tanh(self.fc3(h))
         return y
 
 
 class CriticNetwork(nn.Module):
     def __init__(self, num_state, num_action, hidden1_size=400, hidden2_size=300, init_w=3e-4, perturb=False):
         super(CriticNetwork, self).__init__()
-        self.fc1 = nn.Linear(num_state[0], hidden1_size)
-        self.fc2 = nn.Linear(hidden1_size+num_action[0], hidden2_size)
-        self.fc3 = nn.Linear(hidden2_size, 1)
-
         if perturb:
-            self.bn0 = nn.LayerNorm(num_state[0])
-            self.bn1 = nn.LayerNorm(hidden1_size)
-            self.bn2 = nn.LayerNorm(hidden2_size)
+            self.fc1 = nn.Linear(num_state[0]+num_action[0], hidden1_size)
+            self.fc2 = nn.Linear(hidden1_size, hidden2_size)
+            self.fc3 = nn.Linear(hidden2_size, 1)
+            self.ln0 = nn.LayerNorm(hidden1_size)
+            self.ln1 = nn.LayerNorm(hidden2_size)
         else:
+            self.fc1 = nn.Linear(num_state[0], hidden1_size)
+            self.fc2 = nn.Linear(hidden1_size+num_action[0], hidden2_size)
+            self.fc3 = nn.Linear(hidden2_size, 1)
             self.bn0 = nn.BatchNorm1d(num_state[0])
             self.bn1 = nn.BatchNorm1d(hidden1_size)
         
@@ -83,11 +91,16 @@ class CriticNetwork(nn.Module):
         self.fc3.weight.data.uniform_(-init_w, init_w)
 
     def forward(self, x, action):
-        h = self.bn0(x)
-        h = F.relu(self.fc1(h))
-        h = self.bn1(h)
-        h = F.relu(self.fc2(torch.cat([h, action], dim=1)))
         if self.perturb:
-            h = self.bn2(h)
-        y = self.fc3(h)
+            h = self.fc1(torch.cat([x, action], dim=-1))
+            h = F.relu(self.ln0(h))
+            h = self.fc2(h)
+            h = F.relu(self.ln1(h))
+            y = self.fc3(h)
+        else:
+            h = self.bn0(x)
+            h = F.relu(self.fc1(h))
+            h = self.bn1(h)
+            h = F.relu(self.fc2(torch.cat([h, action], dim=1)))
+            y = self.fc3(h)
         return y

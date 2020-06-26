@@ -41,7 +41,7 @@ class OrnsteinUhlenbeckProcess:
 
 
 class AdaptiveParamNoise:
-    def __init__(self, init_std=0.1, desired_std=0.1, alpha=1.01):
+    def __init__(self, init_std=0.2, desired_std=0.2, alpha=1.01):
         self.init_std = init_std
         self.desired_std = desired_std
         self.alpha = alpha
@@ -102,7 +102,11 @@ class DDPG:
             self.actor_noise.adapt(distance)
 
         std = self.actor_noise.get_std()
-        for perturb_param, param in zip(self.actor_perturb.parameters(), self.actor.parameters()):
+        for perturb_param, param in zip(self.actor_perturb.fc1.parameters(), self.actor.fc1.parameters()):
+            perturb_param.data.copy_(param.data + std*torch.randn_like(param.data))
+        for perturb_param, param in zip(self.actor_perturb.fc2.parameters(), self.actor.fc2.parameters()):
+            perturb_param.data.copy_(param.data + std*torch.randn_like(param.data))
+        for perturb_param, param in zip(self.actor_perturb.fc3.parameters(), self.actor.fc3.parameters()):
             perturb_param.data.copy_(param.data + std*torch.randn_like(param.data))
 
     def get_action(self, state, greedy=False):
