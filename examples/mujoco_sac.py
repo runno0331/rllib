@@ -9,7 +9,7 @@ from models.network.softActorCritic import PolicyNetwork, SoftQNetwork
 from models.buffer.buffer import ReplayBuffer
 from models.logger.logger import Logger
 
-max_episodes = 1000
+max_episodes = 3000
 memory_capacity = 1e6
 gamma = 0.99
 alpha = 0.2  # temperature
@@ -34,9 +34,9 @@ hidden_size = 256
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-policyNet = PolicyNetwork(num_state, num_action, hidden_size, action_range)
-qnet1 = SoftQNetwork(num_state, num_action, hidden_size)
-qnet2 = SoftQNetwork(num_state, num_action, hidden_size)
+policyNet = PolicyNetwork(num_state, num_action, hidden_size, action_range).to(device)
+qnet1 = SoftQNetwork(num_state, num_action, hidden_size).to(device)
+qnet2 = SoftQNetwork(num_state, num_action, hidden_size).to(device)
 optimizer_policy = optim.Adam(policyNet.parameters(), lr=lr)
 optimizer_qnet1 = optim.Adam(qnet1.parameters(), lr=lr)
 optimizer_qnet2 = optim.Adam(qnet2.parameters(), lr=lr)
@@ -63,7 +63,6 @@ print("Start training")
 for episode in range(max_episodes):
     observation = env.reset()
     total_reward = 0
-    step_count += 1
 
     for step in range(max_steps):
         action = agent.get_action(observation)
